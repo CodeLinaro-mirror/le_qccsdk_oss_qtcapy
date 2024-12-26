@@ -13,9 +13,13 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
+
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 import logging
 from enum import Enum, auto
-
+import os
 
 class LogCategory(Enum):
     DEBUG = auto()
@@ -35,7 +39,10 @@ class DutLogger:
             logging.info(log_msg)
         else:
             logging.error(log_msg)
-
+        if not os.path.exists(".\log"):
+            os.makedirs(".\log")
+        # for window pc
         if DutLogger.log_file_name :
-            with open(("/var/log/{}").format(DutLogger.log_file_name), "a") as file:
+            logfile = os.path.join('.\log',DutLogger.log_file_name)
+            with open(logfile, "a") as file:
                 file.write(f"{log_type.name} :  {log_msg}"+"\n")

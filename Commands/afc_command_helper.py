@@ -14,10 +14,10 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
 
-try:
-    from .XXX_command_helper import XXX_CommandHelper as CommandHelper
-except ImportError:
-    from .command_helper import CommandHelper
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+from .command_helper import CommandHelper
 from .shared_enums import CommandOperation, DebugLogLevel, QuickTrackRequestTLV, QuickTrackResponseTLV
 from .command_interpreter import CommandInterpreter
 from .command import Command

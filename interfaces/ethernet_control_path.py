@@ -13,6 +13,10 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
+
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 import socket
 import sys
 from interfaces.control_path import ControlPath
@@ -27,16 +31,18 @@ class EthernetControlPath(ControlPath):
     Sample implemtation for ethernet based control path.
     """
 
-    def __init__(self, local_address, local_port, quicktrack_api_parser):
+    def __init__(self, local_address, local_port, local_uartport, quicktrack_api_parser):
         self.host = local_address
         self.port = int(local_port)
         self.addr_port = (self.host, self.port)
+        self.uartport = local_uartport
         self.quicktrack_api_parser = quicktrack_api_parser
 
     def start(self):
         """Starts a tcp socket server to receive all the api in tlv format
         """
         self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        print(f"Client connected to {self.host}:{self.port}")
         try:
             self.client.bind((self.host, self.port))
         except Exception as err:

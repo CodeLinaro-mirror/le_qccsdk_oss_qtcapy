@@ -13,25 +13,27 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
+
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 """Module that contains all the wifi driver commands to be executed."""
 from .command import ApiInterface, ApiReturnStatus
-try:
-    from .XXX_sta_command_helper import XXX_StaCommandHelper as StaCommandHelper
-except ImportError:
-    from .sta_command_helper import StaCommandHelper
+from .sta_command_helper import StaCommandHelper
 from .command import Command
 from .shared_enums import *
 import sys
 import os
 from Commands.dut_logger import DutLogger, LogCategory
-
+from Commands.command_helper import CommandHelper
+from Commands.global_var import global_var
 
 class STA_ASSOCIATE(ApiInterface):  # noqa : N801
     """Joins/associates with the station on a linux environment."""
 
-    def execute(self):  # noqa : D1025
+    def execute(self, uart_port):  # noqa : D1025
         """Method that starts the supplicant to connect to the AP."""
-        self.std_err = StaCommandHelper.sta_associate()
+        self.std_err = StaCommandHelper.sta_associate(uart_port)
 
     def get_return_status(self):  # noqa : D1025
         """Returns the return status with the status code with following description.
@@ -76,11 +78,12 @@ tlv_sta_config_mapper = {
     QuickTrackRequestTLV.DOMAIN_SUFFIX_MATCH: "domain_suffix_match",
     QuickTrackRequestTLV.PAC_FILE: "pac_file",
     QuickTrackRequestTLV.STA_OWE_GROUP: "sta_owe_group",
+    QuickTrackRequestTLV.STATIC_IP: "ip"
 }
 class STA_CONFIGURE(ApiInterface):
     "Configures the STAUT configuration."
 
-    def execute(self):
+    def execute(self, uart_port):
         "Method to configure the STAUT"
         config = {}
         for tlv_value in self.params:
@@ -90,7 +93,7 @@ class STA_CONFIGURE(ApiInterface):
             else:
                 self.std_err = "STA configure: Unknown TLV {}".format(tlv_value)
                 return
-        self.std_out, self.std_err = StaCommandHelper.sta_configure(config)
+        self.std_out, self.std_err = StaCommandHelper.sta_configure(uart_port, config)
 
     def get_return_status(self):
         """Returns the return status with the status code with following description.
@@ -105,6 +108,107 @@ class STA_CONFIGURE(ApiInterface):
             return ApiReturnStatus(
                 1, "Unable to configure STAUT {}".format(self.std_err)
             )
+
+class ASSIGN_STATIC_IP(ApiInterface):
+    """ Class used to assign static ip for ethenet and wireless interfaces"""
+
+    def execute(self,uart_port):
+        """Method to assign the static IP for ethernet and wireless interfaces."""
+        for tlv_value in self.params:
+            config_name = tlv_sta_config_mapper.get(tlv_value)
+            if config_name:
+                static_ip = self.params[tlv_value]
+                self.std_out = StaCommandHelper.assign_static_ip(uart_port, static_ip)
+
+    def get_return_status(self):
+        """Returns the return status with the status code with following description.
+
+        status code:
+        0 - success, returns the static ip status.
+        1- Failure, unable to set the static ip, returns the standard error."""
+        if self.std_out:
+            return ApiReturnStatus(
+                0, "Static Ip successfully assigned to wireless interface"
+            )
+        else:
+            return ApiReturnStatus(1, "Unable to set static ip.")
+
+class GET_MAC_ADDRESS(ApiInterface):
+    def execute(self, uart_port):
+        """Method to execute and get the MAC address."""
+        self.std_out = StaCommandHelper.get_mac_addr(uart_port)
+        if self.std_out is None:
+            self.std_err = "Unable to get mac address as the required parameters to get the mac address is not passed."
+
+    def get_return_status(self):
+        """Returns the return status with the status code with following description.
+
+        status code:
+        0 - success, returns the MAC address.
+        1- Failure, unable to get the MAC address, returns None."""
+        if self.std_out is not None:
+            dut_mac_add = str(self.std_out)
+            return ApiReturnStatus(
+                0,
+                dut_mac_add,
+                {QuickTrackResponseTLV.DUT_MAC_ADD: dut_mac_add}
+            )
+        else:
+            return ApiReturnStatus(1, str(self.std_err))
+
+class GET_IP_ADDRESS(ApiInterface):
+    def execute(self, uart_port):
+        """Method to execute and get the IP address ."""
+        self.std_out = StaCommandHelper.get_if_ip_addr(uart_port)
+        if self.std_out is None:
+            self.std_err = "Unable to get IP address."
+
+    def get_return_status(self):
+        """Returns the return status with the status code with following description.
+
+        status code:
+        0 - success, returns the IP address.
+        1- Failure, unable to get the IP address, returns None."""
+        if self.std_out is not None:
+            ip_address = str(self.std_out)
+            return ApiReturnStatus(
+                0,
+                ip_address,
+                {QuickTrackResponseTLV.DUT_WLAN_IP_ADD: ip_address}
+            )
+        else:
+            return ApiReturnStatus(1, str(self.std_out))
+
+class GET_CONTROL_APP_VERSION(ApiInterface):
+    def execute(self,uart_port):
+        """Method to execute and get the dut app version number."""
+        self.std_out = "v2.2.1.4"
+
+    def get_return_status(self):
+        """Returns the return status with the status code with following description.
+
+        status code:
+        0 - success, returns the DUT app version number."""
+        supported_api_version = str(self.std_out)
+        return ApiReturnStatus(
+            0,
+            supported_api_version,
+            {QuickTrackResponseTLV.QuickTrack_API_VERSION: supported_api_version}
+        )
+
+class DEVICE_RESET(ApiInterface):
+    """ Class used to reset the device """
+
+    def execute(self, uart_port):
+        interface = CommandHelper.get_interface_name()
+        self.std_out, self.std_err = StaCommandHelper.sta_disconnect(uart_port)
+        StaCommandHelper.reset_interface_ip(uart_port, interface)
+
+    def get_return_status(self):
+        if self.std_err is None:
+            return ApiReturnStatus(0, "Device reset successfully")
+        else:
+            return ApiReturnStatus(1, "Unable to reset the device " + self.std_err)
 
 class STA_SET_PARAM(ApiInterface):
     "Set run-time parameter to the STAUT."
@@ -133,10 +237,10 @@ class STA_SET_PARAM(ApiInterface):
 class STA_DISCONNECT(ApiInterface):  # noqa : N801
     """Class used to disconnect the DUT that is connected."""
 
-    def execute(self):  # noqa : D1025
+    def execute(self, uart_port):  # noqa : D1025
         """Method used to disconnect the STAUT that is connected to the AP and reset the station back to its normal state after test execution."""
 
-        self.std_out, self.std_err = StaCommandHelper.sta_disconnect()
+        self.std_out, self.std_err = StaCommandHelper.sta_disconnect(uart_port)
 
     def get_return_status(self):  # noqa : D1025
         """Returns the return status with the status code with following description.
@@ -146,7 +250,7 @@ class STA_DISCONNECT(ApiInterface):  # noqa : N801
         1- Failure, unable to disconnect, returns the standard error."""
         if self.std_err is None:
             return ApiReturnStatus(
-                0, "QuickTrack tool STA was successfully disconnected: " + str(self.std_out)
+                0, "QuickTrack tool STA was successfully disconnected"
             )
         else:
             return ApiReturnStatus(
@@ -174,12 +278,41 @@ class STA_SEND_DISCONNECT(ApiInterface):
                 "STAUT reports problem sending disconnection frame: {}".format(self.std_err)
             )
 
+class START_LOOP_BACK_SERVER(ApiInterface):
+    """QuickTrack API for initializing the loopback server.
+    Creates a parser for echoing back loop back data to the test tool.
+    """
+
+    def execute(self, uart_port):
+        try:
+            StaCommandHelper.start_loopback_server(uart_port)
+            return None
+        except Exception as ex:
+            return ApiReturnStatus(1, "Failed to initialise loopback server")
+
+    def get_return_status(self):
+
+        return ApiReturnStatus(
+            0,
+            "Loop back server initialized",
+            {QuickTrackResponseTLV.LOOP_BACK_SERVER_PORT: global_var.get_value('port')}
+        )
+
+class STOP_LOOP_BACK_SERVER(ApiInterface):
+    """QuickTrack API for stopping the loopback server
+    """
+    def execute(self, uart_port):
+        StaCommandHelper.stop_loopback_server(uart_port)
+
+    def get_return_status(self):
+        return ApiReturnStatus(0, "Loopback server in idle state")
+
 class STA_REASSOCIATE(ApiInterface):
-    def execute(self):
+    def execute(self, uart_port):
         """Method to request STA to reassociate with AP.
         """
 
-        self.std_out, self.std_err = StaCommandHelper.sta_reassociate()
+        self.std_out, self.std_err = StaCommandHelper.sta_reassociate(uart_port)
 
     def get_return_status(self):
         if self.std_err is None:

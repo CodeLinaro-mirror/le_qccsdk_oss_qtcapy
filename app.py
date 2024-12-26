@@ -15,17 +15,18 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
 
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 from interfaces.connection_info import ConnectionInfo, ConnectionType
 from interfaces.ethernet_control_path import EthernetControlPath
 #from interfaces.uart_control_path import UartControlPath
 from parsers.quicktrack_api_parser import QuickTrackApiParser
 from api.quicktrack_api_linux import QuickTrackApiLinux
 from api.control_app_helper import ControlAppHelper
-try:
-    from Commands.XXX_command_helper import XXX_CommandHelper as CommandHelper
-except ImportError:
-    from Commands.command_helper import CommandHelper
+from Commands.command_helper import CommandHelper
 from Commands.dut_logger import DutLogger, LogCategory
+from Commands.global_var import *
 from datetime import datetime
 
 class dutControlApp:
@@ -38,28 +39,34 @@ class dutControlApp:
         """
         now = datetime.now()
         dt_string = now.isoformat()
-        DutLogger.log_file_name = "dut_control_app_logs_{}.log".format(dt_string)
+        dt_string_r = dt_string.replace(":", "_")
+        DutLogger.log_file_name = "dut_control_app_logs_{}.log".format(dt_string_r)
         self.connection_info = connection_info
-        api_impl = QuickTrackApiLinux()
+        api_impl = QuickTrackApiLinux(self.connection_info)
         self.api_parser = QuickTrackApiParser(api_impl)
         if self.connection_info.connection_type == ConnectionType.ETHERNET:
             self.server = EthernetControlPath(
-                connection_info.ip_address, connection_info.ip_port, self.api_parser
+                connection_info.ip_address, connection_info.ip_port, connection_info.uart_port, self.api_parser
             )
 
 if __name__ == "__main__":
-    CommandHelper.check_if_root_user()
-
     options = ControlAppHelper.get_optional_parameters()
     if options.get("--interface") is None:
-        CommandHelper.INTERFACE_LOGICAL_NAME = ControlAppHelper.get_default_wlan_name()
+        CommandHelper.INTERFACE_LOGICAL_NAME = "wlan1"
     else:
         ControlAppHelper.set_wireless_if(options.get("--interface"))
         DutLogger.log(LogCategory.INFO, "Configuring {} as interface for control app usage.\n".format(CommandHelper.get_interface_name()))
 
     # Use Ethernet as control interface
     ethernet_ip, ethernet_port = ControlAppHelper.get_ethernet_connection_inputs(options)
+    uart_port = ControlAppHelper.get_uart_inputs(options)
     dut_control_app_obj = dutControlApp(
-        ConnectionInfo(ConnectionType.ETHERNET, ip_address=ethernet_ip, ip_port=ethernet_port)
+        ConnectionInfo(ConnectionType.ETHERNET, ip_address=ethernet_ip, ip_port=ethernet_port, uart_port=uart_port)
     )
+
+    global_var._init()
+    global_var.set_value('port', ethernet_port)
+    global_var.set_value('host', ethernet_ip)
+    global_var.set_value('uart_port', uart_port)
+
     dut_control_app_obj.server.start()

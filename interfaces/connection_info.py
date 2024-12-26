@@ -13,6 +13,10 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
+
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 from enum import Enum
 
 
@@ -33,6 +37,7 @@ class ConnectionInfo:  # noqa : D100
         """IP address details in case of ethernet based connection"""
         self.ip_address = ip_address
         self.ip_port = ip_port
+        self.uart_port = uart_port
 
 
 class ConnectionType(Enum):

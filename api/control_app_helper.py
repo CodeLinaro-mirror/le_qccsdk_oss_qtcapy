@@ -13,16 +13,17 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
+
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 import getopt
 import sys
 import re
 from Commands.command import ApiReturnStatus, ApiInterface, Command
 from typing import Type
 from Commands.dut_logger import DutLogger, LogCategory
-try:
-    from Commands.XXX_command_helper import XXX_CommandHelper as CommandHelper
-except ImportError:
-    from Commands.command_helper import CommandHelper
+from Commands.command_helper import CommandHelper
 from Commands.shared_enums import BssIdentifierBand
 
 
@@ -34,7 +35,7 @@ DEFAULT_BAUDRATE = "57600"
 
 class ControlAppHelper:
     @staticmethod
-    def execute_control_app_api(api_to_execute: Type[ApiInterface]) -> ApiReturnStatus:
+    def execute_control_app_api(api_to_execute: Type[ApiInterface], uart_port) -> ApiReturnStatus:
         """Method to execute the specific QuickTrack API command implementation for the DUT
 
         Parameters
@@ -43,7 +44,11 @@ class ControlAppHelper:
             Type of API to execute
 
         """
-        api_to_execute.execute()
+        argv = sys.argv[1:]
+        options, args = getopt.getopt(argv,"",["interface=", "ip=", "port=", "uart_port="])
+        params = dict(options)
+        uart_port = params['--uart_port']
+        api_to_execute.execute(uart_port)
         ret_val = api_to_execute.get_return_status()
         return ret_val
 
@@ -86,19 +91,19 @@ class ControlAppHelper:
     def set_wireless_if(name_arg):
         if name_arg.find(":") == -1:
             CommandHelper.INTERFACE_LOGICAL_NAME = name_arg
-        else:
-            band_name = name_arg.split(",")
-            for x in band_name:
-                if x[0:2] == "2:":
-                    name_list = [BssIdentifierBand._24GHz.value, x[2:], 0]
-                if x[0:2] == "5:":
-                    name_list = [BssIdentifierBand._5GHz.value, x[2:], 0]
-                if x[0:2] == "6:":
-                    name_list = [BssIdentifierBand._6GHz.value, x[2:], 0]
-                std_out, std_err = CommandHelper.check_wlan_created(x[2:])
-                if not std_out: # Create if not exist
-                    CommandHelper.create_wlan_if(x[2:])
-                CommandHelper.INTERFACE_LIST.append(name_list)
+        # else:
+        #     band_name = name_arg.split(",")
+        #     for x in band_name:
+        #         if x[0:2] == "2:":
+        #             name_list = [BssIdentifierBand._24GHz.value, x[2:], 0]
+        #         if x[0:2] == "5:":
+        #             name_list = [BssIdentifierBand._5GHz.value, x[2:], 0]
+        #         if x[0:2] == "6:":
+        #             name_list = [BssIdentifierBand._6GHz.value, x[2:], 0]
+        #         std_out, std_err = CommandHelper.check_wlan_created(x[2:])
+        #         if not std_out: # Create if not exist
+        #             CommandHelper.create_wlan_if(x[2:])
+        #         CommandHelper.INTERFACE_LIST.append(name_list)
 
     @staticmethod
     def __get_interface_from_available_options(interface_names):
@@ -142,7 +147,7 @@ class ControlAppHelper:
         """
         try:
             argv = sys.argv[1:]
-            options, args = getopt.getopt(argv,"",["interface=", "ip=", "port="])
+            options, args = getopt.getopt(argv,"",["interface=", "ip=", "port=", "uart_port="])
             return dict(options)
         except getopt.GetoptError as err:
             DutLogger.log(LogCategory.ERROR, "Error in fetching optional parameters :" + str(err))
@@ -200,3 +205,24 @@ class ControlAppHelper:
         else:
             DutLogger.log(LogCategory.INFO, "IP address not specified, hence using INADDR_ANY\n")
             return "0.0.0.0"
+
+    @staticmethod
+    def get_uart_inputs(options):
+        """Gets valid uart port from user input, if not present returns com3
+
+        Parameters
+        ----------
+        options : dict
+            dictionary of optional parameters
+
+        Returns
+        -------
+        str
+            uart port
+        """
+        if "--uart_port" in options.keys():
+            arg = options.get("--uart_port")
+            return arg
+        else:
+            DutLogger.log(LogCategory.INFO, "uart port not specified, hence using defult uart port\n")
+            return "com3"

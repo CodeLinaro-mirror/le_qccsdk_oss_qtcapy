@@ -13,17 +13,26 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
-try:
-    from .XXX_command_helper import XXX_CommandHelper as CommandHelper
-except ImportError:
-    from .command_helper import CommandHelper
+
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+from .command_helper import CommandHelper
 from .shared_enums import DebugLogLevel, P2PConnType, WpsDeviceRole
 from .command_interpreter import CommandInterpreter
 from .command import Command
 import os
 from datetime import datetime
 from Commands.dut_logger import DutLogger, LogCategory
-from datetime import datetime
+from .QCC730 import *
+from Commands.global_var import *
+import logging.handlers
+import logging
+import time
+import re
+import serial
+import threading
+import sys
 
 command_interpreter_obj = CommandInterpreter()
 store_wpas_config_for_debug = False
@@ -50,6 +59,108 @@ def get_server_cert_hash(pem_file):
 
 class StaCommandHelper:
     store_test_artifcats = False
+    @staticmethod
+    def sta_configure(uart_port, params: dict):
+        """Method to configure the wpa supplicant.
+
+        Parameters
+        ----------
+        params : [dict]
+            [parameters for sta configuration.]
+        """
+        try:
+            objDut = QCC730_Command(uart_port)
+            if "sta_ssid" in params:
+                objDut.enableWireless()
+                global_var.set_value('sta_ssid', params["sta_ssid"])
+
+            if "psk" in params:
+                print("[debug_exec] set psk")
+                objDut.setPrivatekey(params["psk"])
+
+            objDut.setSecurity(params.get("key_mgmt", "WPA-PSK"),
+                                params.get("proto", "RSN"),
+                                params.get("pairwise", "CCMP"),
+                                params.get("group", "CCMP"))
+
+            return "STA successfully configured.", None
+        except Exception as ex:
+            return None, "Unable to configure STA " + str(ex)
+
+    @staticmethod
+    def get_mac_addr(uart_port):
+        objDut = QCC730_Command(uart_port)
+        return objDut.getMacAddr()
+
+    @staticmethod
+    def get_if_ip_addr(uart_port):
+        objDut = QCC730_Command(uart_port)
+        return objDut.getIPconfig("wlan1")
+
+    @staticmethod
+    def assign_static_ip(uart_port, static_ip):
+        """Assigns the static IP for the PC(DUT)."""
+        objDut = QCC730_Command(uart_port)
+        parts = static_ip.split('.')
+        gateway = f"{parts[0]}.{parts[1]}.{parts[2]}.1"
+        mask = "255.255.255.0"
+        global_var.set_value('static_ip',static_ip)
+        print(static_ip,mask,gateway)
+        return objDut.setStaticIp(static_ip,mask,gateway)
+
+    @staticmethod
+    def reset_interface_ip(uart_port, if_name):
+        objDut = QCC730_Command(uart_port)
+        objDut.initReset()
+        return True
+
+    @staticmethod
+    def start_loopback_server(uart_port):
+        objDut = QCC730_Command(uart_port)
+        objDut.configUdpRx(global_var.get_value('static_ip'), global_var.get_value('port'), echo=True)
+        # udp -s -B 127.0.0.1 -e -p 9004
+        return True
+
+    @staticmethod
+    def stop_loopback_server(uart_port):
+        objDut = QCC730_Command(uart_port)
+        objDut.trafficReset()
+        return True
+
+    @staticmethod
+    def sta_associate(uart_port):
+        objDut = QCC730_Command(uart_port)
+        sta_ssid = global_var.get_value('sta_ssid')
+        if sta_ssid is None:
+            raise ValueError("sta_ssid is None")
+        else:
+            objDut.connectAp(sta_ssid)
+        # Skip connection check as Tool will verify
+        return None
+
+    @staticmethod
+    def sta_reassociate(uart_port):
+        objDut = QCC730_Command(uart_port)
+        sta_ssid = global_var.get_value('sta_ssid')
+        if sta_ssid is None:
+            raise ValueError("sta_ssid is None")
+        else:
+            objDut.connectAp(sta_ssid)
+        # Skip connection check as Tool will verify
+        return None, None
+
+    @staticmethod
+    def sta_disconnect(uart_port):
+        """Method to stop the wpa_supplicant service.
+
+        Parameters
+        ----------
+        interface_name : [str]
+            [interface name on which the supplicant needs to be stopped.]
+        """
+        objDut = QCC730_Command(uart_port)
+        std_out, std_err = objDut.disconnectAp()
+        return std_out, std_err
 
     @staticmethod
     def get_wpa_supp_config(config_enums: dict, merge_config_file: bool) -> str:  # noqa:E999
@@ -206,30 +317,6 @@ class StaCommandHelper:
         return config_dict
 
     @staticmethod
-    def sta_configure(params: dict):
-        """Method to configure the wpa supplicant.
-
-        Parameters
-        ----------
-        params : [dict]
-            [parameters for sta wpa_supplicant configuration.]
-
-        merge_config_file : bool
-            Flag to indicate if new supplicant config file has to be create or the new config has to be merged into existing file
-        """
-        wpa_supplicant_config = StaCommandHelper.get_wpa_supp_config(params, False)
-
-        try:
-            with open(wpa_supplicant_config_file, "w+") as file:
-                file.write(wpa_supplicant_config)
-            if store_wpas_config_for_debug:
-                StaCommandHelper.__store_supplicant_config_for_debug(params)
-            return "Wpa supplicant successfully configured.", None
-        except Exception as ex:
-            return None, "Unable to configure wpa supplicant " + str(ex)
-
-
-    @staticmethod
     def __store_supplicant_config_for_debug(wpa_supplicant_config):
         "Method to store the wpa supplicant config file for debug purpose."
         now = datetime.now()
@@ -246,48 +333,6 @@ class StaCommandHelper:
                 file.write(wpa_supplicant_config)
         except IOError as err:
             DutLogger.log(LogCategory.ERROR, "Error when creating wpa_supplicant debug file:" + str(err))
-
-    @staticmethod
-    def sta_associate():
-        """Method to start the wpa_supplicant service."""
-        interface_name = CommandHelper.get_interface_name()
-        #StaCommandHelper.store_test_artifcats = True
-        log_level = StaCommandHelper.__get_sta_debug_log_level()
-        StaCommandHelper.clear_supplicant_logs()
-
-        CommandHelper.run_shell_command("sudo rfkill unblock wlan")
-        CommandHelper.run_shell_command("sudo killall wpa_supplicant")
-        CommandHelper.pause_execution(3)
-
-        supplicant_start_command = "sudo /usr/local/bin/WFA-Hostapd-Supplicant/wpa_supplicant -B -t -c {} -i {}".format(wpa_supplicant_config_file, interface_name)
-        if log_level:
-            supplicant_start_command += " {} -f {}".format(log_level, wpa_supplicant_log_folder_path)
-        CommandHelper.run_shell_command(supplicant_start_command)
-
-        # Skip connection check as Tool will verify
-        return None
-
-    @staticmethod
-    def sta_disconnect():
-        """Method to stop the wpa_supplicant service.
-
-        Parameters
-        ----------
-        interface_name : [str]
-            [interface name on which the supplicant needs to be stopped.]
-        """
-        std_out, std_err = CommandHelper.get_process_id("wpa_supplicant")
-        if std_out:
-            std_out, std_err = CommandHelper.run_shell_command(
-                "sudo killall wpa_supplicant"
-            )
-            if StaCommandHelper.store_test_artifcats:
-                StaCommandHelper.store_supplicant_config()
-                #StaCommandHelper.__log_supplicant_logs()
-                StaCommandHelper.store_test_artifcats = False
-            return std_out, std_err
-        else:
-            return std_out, std_err
 
     @staticmethod
     def __log_supplicant_logs():
@@ -445,14 +490,6 @@ class StaCommandHelper:
         return CommandHelper.run_shell_command(
             ("sudo wpa_cli -i {} disconnect").format(if_name)
         )
-
-    @staticmethod
-    def sta_reassociate():
-        if_name = CommandHelper.get_interface_name()
-
-        return CommandHelper.run_shell_command(
-            ("sudo wpa_cli -i {} reconnect").format(if_name)
-        ) 
 
     @staticmethod
     def set_sta_param(param_str, value):

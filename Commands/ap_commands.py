@@ -14,12 +14,12 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
 
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 from .shared_enums import QuickTrackRequestTLV
 from .command import ApiInterface, ApiReturnStatus, Command
-try:
-    from .XXX_ap_command_helper import XXX_ApCommandHelper as ApCommandHelper
-except ImportError:
-    from .ap_command_helper import ApCommandHelper
+from .ap_command_helper import ApCommandHelper
 import sys
 import os
 from Commands.dut_logger import DutLogger, LogCategory

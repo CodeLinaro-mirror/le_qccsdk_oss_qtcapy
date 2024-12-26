@@ -13,12 +13,16 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
+
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 """Utility module used in api commands."""
 import subprocess
 import os
 from pathlib import Path
 from .shared_enums import *
-import fcntl
+# import fcntl
 import socket
 import struct
 
@@ -162,10 +166,11 @@ class CommandHelper:
 
     @staticmethod
     def get_hw_addr(ifname):
-        # https://stackoverflow.com/questions/159137/getting-mac-address
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        info = fcntl.ioctl(s.fileno(), 0x8927, struct.pack('256s', bytes(ifname, 'utf-8')[:15]))
-        return ':'.join('%02x' % b for b in info[18:24])
+        # # https://stackoverflow.com/questions/159137/getting-mac-address
+        # s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # info = fcntl.ioctl(s.fileno(), 0x8927, struct.pack('256s', bytes(ifname, 'utf-8')[:15]))
+        # return ':'.join('%02x' % b for b in info[18:24])
+        return None
 
     @staticmethod
     def create_new_interface_bridge_network():
@@ -209,30 +214,30 @@ class CommandHelper:
     def reset_interface_ip(if_name):
         CommandHelper.run_shell_command("sudo ip addr flush dev {}".format(if_name))
 
-    @staticmethod
-    def assign_static_ip(dut_static_ip, input_interface_name=None):
-        """Assigns the static IP for the DUT."""
-        CommandHelper.STATIC_IP = dut_static_ip
+    # @staticmethod
+    # def assign_static_ip(dut_static_ip, input_interface_name=None):
+    #     """Assigns the static IP for the DUT."""
+    #     CommandHelper.STATIC_IP = dut_static_ip
 
-        std_out, std_err = CommandHelper.get_all_interface_ip()
-        if CommandHelper.BRIDGE_WLANS in std_out:#If bridge network present assign ip to it.
-            CommandHelper.run_shell_command("sudo ip addr add {}/24 dev {}".format(dut_static_ip, CommandHelper.BRIDGE_WLANS))
-            return True
+    #     std_out, std_err = CommandHelper.get_all_interface_ip()
+    #     if CommandHelper.BRIDGE_WLANS in std_out:#If bridge network present assign ip to it.
+    #         CommandHelper.run_shell_command("sudo ip addr add {}/24 dev {}".format(dut_static_ip, CommandHelper.BRIDGE_WLANS))
+    #         return True
 
-        if input_interface_name:
-            interface_name = input_interface_name
-        else:
-            interface_name = CommandHelper.get_interface_name()
-        if interface_name:
-            CommandHelper.run_shell_command("sudo ip addr flush dev {}".format(interface_name))
-            CommandHelper.run_shell_command(
-                ("sudo ip addr add {}/24 dev {}").format(
-                    dut_static_ip, interface_name
-                )
-            )
-            return True
-        else:
-            return False
+    #     if input_interface_name:
+    #         interface_name = input_interface_name
+    #     else:
+    #         interface_name = CommandHelper.get_interface_name()
+    #     if interface_name:
+    #         CommandHelper.run_shell_command("sudo ip addr flush dev {}".format(interface_name))
+    #         CommandHelper.run_shell_command(
+    #             ("sudo ip addr add {}/24 dev {}").format(
+    #                 dut_static_ip, interface_name
+    #             )
+    #         )
+    #         return True
+    #     else:
+    #         return False
 
     @staticmethod
     def clear_bss_identifiers():

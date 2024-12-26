@@ -4,6 +4,9 @@
 
 /* THE SOFTWARE IS PROVIDED 'AS IS' AND THE AUTHOR DISCLAIMS ALL / / WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED / / WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL / / THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR / / CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING / / FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF / / CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT / / OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS / / SOFTWARE. */
 
+/* Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+   SPDX-License-Identifier: BSD-3-Clause-Clear */
+
 ------------------------------------------------------------------------
 Run
 ------------------------------------------------------------------------
@@ -32,3 +35,9 @@ to:
 ```
 from .new_ap_command_helper import New_ApCommandHelper as ApCommandHelper
 ```
+
+------------------------------------------------------------------------
+For QCC730 Run
+------------------------------------------------------------------------
+STAUT:
+python app.py --ip 192.168.1.77 --port 9004 --interface wlan1 --uart_port com3
