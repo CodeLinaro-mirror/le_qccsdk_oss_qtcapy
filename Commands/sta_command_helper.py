@@ -33,6 +33,7 @@ import re
 import serial
 import threading
 import sys
+from .cli_helper import cli_serial_helper
 
 command_interpreter_obj = CommandInterpreter()
 store_wpas_config_for_debug = False
@@ -59,98 +60,152 @@ def get_server_cert_hash(pem_file):
 
 class StaCommandHelper:
     store_test_artifcats = False
-    @staticmethod
-    def sta_configure(uart_port, params: dict):
-        """Method to configure the wpa supplicant.
-
-        Parameters
-        ----------
-        params : [dict]
-            [parameters for sta configuration.]
-        """
-        try:
-            objDut = QCC730_Command(uart_port)
-            if "sta_ssid" in params:
-                objDut.enableWireless()
-                global_var.set_value('sta_ssid', params["sta_ssid"])
-
-            if "psk" in params:
-                print("[debug_exec] set psk")
-                objDut.setPrivatekey(params["psk"])
-
-            objDut.setSecurity(params.get("key_mgmt", "WPA-PSK"),
-                                params.get("proto", "RSN"),
-                                params.get("pairwise", "CCMP"),
-                                params.get("group", "CCMP"))
-
-            return "STA successfully configured.", None
-        except Exception as ex:
-            return None, "Unable to configure STA " + str(ex)
+    sta_config = {}
+    key_mgmt = 0
 
     @staticmethod
-    def get_mac_addr(uart_port):
-        objDut = QCC730_Command(uart_port)
-        return objDut.getMacAddr()
+    def sta_configure(config: dict):
+        StaCommandHelper.sta_config = config
+
+        key_mgmt = config.get("key_mgmt", "WPA-PSK")
+        proto = config.get("proto", "RSN")
+        pairwise = config.get("pairwise", "CCMP")
+        group = config.get("group", "CCMP")
+
+        dutEncpType = ""
+        if (re.match('^TKIP$',pairwise,re.I) or re.match('^TKIP$',group,re.I)):
+            dutEncpType = "TKIP"
+        elif (re.match('^CCMP$',pairwise,re.I) or re.match('^CCMP$',group,re.I)):
+            dutEncpType = "CCMP"
+        else:
+            if (re.match('^RSN$',proto,re.I)):
+                dutEncpType = "CCMP"
+            elif (re.match('^WPA$',proto,re.I)):
+                dutEncpType = "TKIP"
+            else:
+                dutEncpType = "CCMP"
+
+        dutkeymgmttype = ""
+        if (re.match('^RSN$',proto,re.I)):
+            if (re.match('^SAE WPA-PSK$',key_mgmt,re.I)):
+                dutkeymgmttype = "SAE_WPA2"
+            elif (re.match('^SAE$',key_mgmt,re.I)):
+                dutkeymgmttype = "SAE"
+            else:
+                dutkeymgmttype = "WPA2"
+        elif (re.match('^WPA$',proto,re.I)):
+            dutkeymgmttype = "WPA"
+        else:
+            dutkeymgmttype = "WPA2"
+
+        security_map = {
+            ("", ""):               0,   # None
+            ("CCMP", "WPA2"):       1,   # WPA2-PSK
+            ("CCMP-256", "WPA2"):   2,   # WPA2-PSK-256
+            ("CCMP", "SAE"):        3,   # SAE (default to HNP)
+            ("CCMP", "SAE-H2E"):    4,   # SAE-H2E
+            ("CCMP", "SAE-AUTO"):   5,   # SAE-AUTO
+            ("CCMP", "WAPI"):       6,   # WAPI
+            ("CCMP", "EAP-TLS"):    7,   # EAP-TLS
+            ("WEP", "WEP"):         8,   # WEP
+            ("TKIP", "WPA"):        9,   # WPA-PSK
+            ("TKIP", "WPA-AUTO"):   10,  # WPA-Auto-Personal
+            ("CCMP", "DPP"):        11,  # DPP
+            ("CCMP", "EAP-PEAP-MSCHAPv2"): 12,
+            ("CCMP", "EAP-PEAP-GTC"):      13,
+            ("CCMP", "EAP-TTLS-MSCHAPv2"): 14,
+            ("CCMP", "EAP-PEAP-TLS"):      15,
+            ("CCMP", "SAE_WPA2"):   20,  # SAE-EXT-KEY / PSK-SAE
+        }
+
+        StaCommandHelper.key_mgmt = security_map.get((dutEncpType, dutkeymgmttype), 0)
+
+        return "Save station configuration.", None
 
     @staticmethod
-    def get_if_ip_addr(uart_port):
-        objDut = QCC730_Command(uart_port)
-        return objDut.getIPconfig("wlan1")
+    def get_mac_addr():
+        output = cli_serial_helper.execute("net iface")
+        pattern   = "Link addr\s*:\s*([0-9a-fA-F:]+)"
+        match     = re.search(pattern, output)
+        mac = ""
+        if match:
+            mac = match.group(1)
+        return mac
 
     @staticmethod
-    def assign_static_ip(uart_port, static_ip):
+    def get_if_ip_addr():
+        output = cli_serial_helper.execute("net ipv4")
+        pattern = "preferred\s+(\d+.\d+.\d+.\d+)"
+        match = re.search(pattern, output)
+        if match:
+            ip = match.group(1)
+        else:
+            ip = ""
+        return ip
+
+    @staticmethod
+    def assign_static_ip(static_ip):
         """Assigns the static IP for the PC(DUT)."""
-        objDut = QCC730_Command(uart_port)
-        parts = static_ip.split('.')
-        gateway = f"{parts[0]}.{parts[1]}.{parts[2]}.1"
-        mask = "255.255.255.0"
-        global_var.set_value('static_ip',static_ip)
-        print(static_ip,mask,gateway)
-        return objDut.setStaticIp(static_ip,mask,gateway)
+        iface = CommandHelper.get_interface_name()
+        static_ip_command = "net ipv4 add {} {} 255.255.255.0".format(iface, static_ip)
+        cli_serial_helper.execute(static_ip_command)
+
+        # check ip
+        output = cli_serial_helper.execute("net ipv4")
+        if re.search(static_ip, output):
+            return "Successfully assign static IP."
+        return "Fail to assign static IP."
 
     @staticmethod
-    def reset_interface_ip(uart_port, if_name):
-        objDut = QCC730_Command(uart_port)
-        objDut.initReset()
+    def reset_interface_ip(if_name):
+        cli_serial_helper.execute("platform reboot")
         return True
 
     @staticmethod
     def start_loopback_server(uart_port):
-        objDut = QCC730_Command(uart_port)
-        objDut.configUdpRx(global_var.get_value('static_ip'), global_var.get_value('port'), echo=True)
+        listen_port = global_var.get_value('port')
+        commandLine = "wificert download -e {}".format(listen_port)
+        cli_serial_helper.execute(commandLine)
         # udp -s -B 127.0.0.1 -e -p 9004
         return True
 
     @staticmethod
-    def stop_loopback_server(uart_port):
-        objDut = QCC730_Command(uart_port)
-        objDut.trafficReset()
+    def stop_loopback_server():
+        cli_serial_helper.execute("wificert download stop")
         return True
 
     @staticmethod
-    def sta_associate(uart_port):
-        objDut = QCC730_Command(uart_port)
-        sta_ssid = global_var.get_value('sta_ssid')
-        if sta_ssid is None:
-            raise ValueError("sta_ssid is None")
+    def sta_associate():
+        ssid = StaCommandHelper.sta_config["sta_ssid"]
+        psk = ""
+        security = ""
+
+        if "key_mgmt" in StaCommandHelper.sta_config:
+            security = StaCommandHelper.sta_config["key_mgmt"]
+        if "psk" in StaCommandHelper.sta_config:
+            psk = StaCommandHelper.sta_config["psk"]
+
+        if security:
+            sta_associate_command = "wifi connect -k {} -s {}  -p {}".format(StaCommandHelper.key_mgmt, ssid, psk)
+        elif not psk or not security:
+            sta_associate_command = "wifi connect -s {}".format(ssid)
         else:
-            objDut.connectAp(sta_ssid)
-        # Skip connection check as Tool will verify
-        return None
+            return "Unknown sta config"
+
+        res = cli_serial_helper.execute_and_wait_until(sta_associate_command, "Connected")
+        if res:
+            return None
+        else:
+            return "Fail to connect AP."
 
     @staticmethod
-    def sta_reassociate(uart_port):
-        objDut = QCC730_Command(uart_port)
-        sta_ssid = global_var.get_value('sta_ssid')
-        if sta_ssid is None:
-            raise ValueError("sta_ssid is None")
-        else:
-            objDut.connectAp(sta_ssid)
+    def sta_reassociate():
+        cls.sta_associate()
         # Skip connection check as Tool will verify
         return None, None
 
     @staticmethod
-    def sta_disconnect(uart_port):
+    def sta_disconnect():
         """Method to stop the wpa_supplicant service.
 
         Parameters
@@ -158,9 +213,9 @@ class StaCommandHelper:
         interface_name : [str]
             [interface name on which the supplicant needs to be stopped.]
         """
-        objDut = QCC730_Command(uart_port)
-        std_out, std_err = objDut.disconnectAp()
-        return std_out, std_err
+        disconnect_command = "wifi disconnect"
+        cli_serial_helper.execute(disconnect_command)
+        return "Disconnection successfully.", None
 
     @staticmethod
     def get_wpa_supp_config(config_enums: dict, merge_config_file: bool) -> str:  # noqa:E999
@@ -654,8 +709,6 @@ class StaCommandHelper:
                     config_list.append(config[index:index+end])
         return config_list, None
 
-
-    
     @staticmethod
     def sta_start_wps(pin_code):
         if_name = CommandHelper.get_interface_name()

@@ -35,7 +35,7 @@ DEFAULT_BAUDRATE = "57600"
 
 class ControlAppHelper:
     @staticmethod
-    def execute_control_app_api(api_to_execute: Type[ApiInterface], uart_port) -> ApiReturnStatus:
+    def execute_control_app_api(api_to_execute: Type[ApiInterface], uart_port=None) -> ApiReturnStatus:
         """Method to execute the specific QuickTrack API command implementation for the DUT
 
         Parameters
@@ -48,7 +48,10 @@ class ControlAppHelper:
         options, args = getopt.getopt(argv,"",["interface=", "ip=", "port=", "uart_port="])
         params = dict(options)
         uart_port = params['--uart_port']
-        api_to_execute.execute(uart_port)
+        try:
+            api_to_execute.execute(uart_port)
+        except TypeError:
+            api_to_execute.execute()
         ret_val = api_to_execute.get_return_status()
         return ret_val
 

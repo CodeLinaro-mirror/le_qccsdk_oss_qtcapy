@@ -67,6 +67,9 @@ tlv_ap_config_mapper = {
     QuickTrackRequestTLV.COUNTRY_CODE: "country_code",
     QuickTrackRequestTLV.WMM_ENABLED: "wmm_enabled",
     QuickTrackRequestTLV.WPA: "wpa",
+    QuickTrackRequestTLV.HT_CAPB: "ht_capb",
+    QuickTrackRequestTLV.VHT_OPER_CENTR_FREQ: "vht_oper_centr_freq",
+    QuickTrackRequestTLV.HE_OPER_CENTR_FREQ: "ht_oper_centr_freq",
     QuickTrackRequestTLV.WPA_KEY_MGMT: "wpa_key_mgmt",
     QuickTrackRequestTLV.RSN_PAIRWISE: "rsn_pairwise",
     QuickTrackRequestTLV.WPA_PASSPHRASE: "wpa_passphrase",
@@ -96,6 +99,7 @@ tlv_ap_config_mapper = {
     QuickTrackRequestTLV.HE_MU_EDCA: "he_mu_edca",
     QuickTrackRequestTLV.OWE_TRANSITION_BSS_IDENTIFIER: "owe_transition_bss_identifier",
     QuickTrackRequestTLV.IGNORE_BROADCAST_SSID: "ignore_broadcast_ssid",
+    QuickTrackRequestTLV.CONTROL_INTERFACE: "control_interface",
 
     QuickTrackRequestTLV.BSS_IDENTIFIER: "bss_identifier",
     QuickTrackRequestTLV.HE_6G_ONLY: "he_6g_only",

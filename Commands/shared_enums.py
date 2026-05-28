@@ -150,6 +150,7 @@ class QuickTrackRequestTLV(int, Enum):
     RSN_PAIRWISE = 0x000d
     WPA_PASSPHRASE = 0x000e
     WPA_PAIRWISE = 0x000f
+    HT_CAPB = 0x0010
     IEEE80211_H = 0x0011
     IEEE80211_W = 0x0012
     VHT_OPER_CHWIDTH = 0x0013
@@ -200,6 +201,7 @@ class QuickTrackRequestTLV(int, Enum):
     SAE_GROUPS = 0x0071
     IEEE80211_AX = 0x0072
     HE_OPER_CHWIDTH = 0x0073
+    HE_OPER_CENTR_FREQ = 0x0074
     MBO = 0x0075
     MBO_CELL_DATA_CONN_PREF = 0x0076
     BSS_TRANSITION = 0x0077
@@ -227,6 +229,7 @@ class QuickTrackRequestTLV(int, Enum):
     HE_MU_EDCA = 0x0090
     TRANSITION_DISABLE = 0x0093
     SERVER_CERT = 0x0099
+    CONTROL_INTERFACE = 0x009c
     OWE_TRANSITION_BSS_IDENTIFIER = 0x00a2
     HE_6G_ONLY = 0x00a6
     GO_INTENT = 0x00c6
@@ -382,6 +385,7 @@ class QuickTrackResponseTLV(int, Enum):
     DUT_WLAN_IP_ADD = 0xa002
     DUT_MAC_ADD = 0xa003
     QuickTrack_API_VERSION = 0xa004
+    PLATFORM_APP_VERSION = 0xa008
     LOOP_BACK_SERVER_PORT = 0xa009
     WSC_PIN_CODE = 0xa00a
     P2P_INTENT_VALUE = 0xa00b

@@ -8,6 +8,7 @@ import serial
 import threading
 import logging
 import logging.handlers
+from .global_var import global_var
 
 logger = logging.getLogger('mylogger.cli_helper')
 logger.debug("cli_helper test\r\n")
@@ -80,7 +81,7 @@ class CLI_Helper:
             time.sleep(0.1)
             self.read_serial()
 
-            if re.search('>', self.serialBuffer, re.M):
+            if re.search('~\$', self.serialBuffer, re.M):
                 break
             else:
                 self.serialhandle.write("\r".encode())
@@ -113,3 +114,33 @@ class CLI_Helper:
     def checkdutCrashTag(self):
         tag = self.dutCrashTag
         return tag
+
+class cli_serial_helper:
+    serial = None
+
+    @classmethod
+    def init(cls, serial_port):
+        if cls.serial == None:
+            cls.serial = CLI_Helper(serial_port)
+        if not cls.serial.serialhandle.is_open:
+            logger.error("Open %s fail.", port)
+
+    @classmethod
+    def execute(cls, command):
+        return cls.serial.writeSerial(command)
+
+    @classmethod
+    def execute_and_search(cls, command, pattern):
+        output = cls.serial.writeSerial(command)
+        return re.search(pattern, output)
+
+    @classmethod
+    def execute_and_wait_until(cls, command, pattern, timeout=5):
+        output = cls.serial.writeSerial(command)
+        expire_time = time.time() + timeout
+        while time.time() < expire_time:
+            time.sleep(0.2)
+            output = cls.serial.readSerialbuffer()
+            if re.search(pattern, output, re.M):
+                return output
+        return None

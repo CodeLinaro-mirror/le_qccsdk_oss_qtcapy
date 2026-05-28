@@ -17,6 +17,8 @@
 # Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause-Clear
 
+import logging
+import logging.handlers
 from .command_helper import CommandHelper
 from .shared_enums import CommandOperation, DebugLogLevel, BssIdentifierBand, WpsDeviceRole
 from .command_interpreter import CommandInterpreter
@@ -25,6 +27,9 @@ from datetime import datetime
 from Commands.dut_logger import DutLogger, LogCategory
 import os
 from datetime import datetime
+from .cli_helper import cli_serial_helper
+
+logger = logging.getLogger('mylogger.cli_helper')
 
 command_interpreter_obj = CommandInterpreter()
 store_hostapd_config_for_debug = False
@@ -35,83 +40,13 @@ hostapd_config_files = []
 
 
 class ApCommandHelper:
+    ap_config = {}
     store_test_artifcats = False
 
     @staticmethod
-    def create_hostapd_config(configuration: dict, append_config_file: bool):
-        """Creates and writes the hostapd configurations received to configuration file in /etc/hostapd/.
-
-        Parameters
-        ----------
-        configuration : dict
-            Configurations to be configured
-
-        merge_config_file : bool
-            Flag to indicate if new hostapd config file has to be create or the new config has to be merged into existing file
-
-        """
-        global hostapd_config_files
-        if not append_config_file:
-            hostapd_file_name = "hostapd.conf"
-            if "hostapd_file_name" in configuration:
-                hostapd_file_name = configuration.pop("hostapd_file_name")
-            hostapd_config_files.append(hostapd_file_name)
-        else:
-            hostapd_file_name = hostapd_config_files[0]
-
-        if "interface_name" in configuration:
-            interface_name = configuration.pop("interface_name")
-        else:
-            interface_name = CommandHelper.get_interface_name()
-
-        hostapd_config, std_err = ApCommandHelper.get_hostapd_config(
-            configuration, interface_name, append_config_file
-        )
-        if std_err is None:
-            try:
-                now = datetime.now()
-                dt_string = now.strftime("%d%m%Y_%H:%M:%S")
-
-                if not append_config_file:
-                    DutLogger.log(LogCategory.DEBUG, "Writing the following configuration into Hostapd file:\n" + str(hostapd_config))
-                    with open(("/etc/hostapd/{}").format(hostapd_file_name), "w+") as file:
-                        file.write(hostapd_config)
-                else:
-                    DutLogger.log(LogCategory.DEBUG, "Appending the following configuration into Hostapd file:\n" + str(hostapd_config))
-                    with open(("/etc/hostapd/{}").format(hostapd_file_name), "a") as file:
-                        file.write(hostapd_config)
-
-                if store_hostapd_config_for_debug:
-                    hostapd_file_path = "/etc/hostapd/hostapd_files"
-                    if not os.path.exists(hostapd_file_path):
-                        os.mkdir(hostapd_file_path)
-                    try:
-                        with open(
-                            "/etc/hostapd/hostapd_files/hostapd" + str(dt_string), "w+"
-                        ) as file:
-                            file.write(hostapd_config)
-                    except IOError as err:
-                        DutLogger.log(LogCategory.ERROR, "Error when creating hostapd debug file:" + str(err))
-            except IOError as err:
-                DutLogger.log(LogCategory.ERROR, "Error writing into Hostapd file:\n" + str(err))
-                return None, str(err)
-            return "Configuration file created", None
-        else:
-            DutLogger.log(LogCategory.ERROR, "Error creating Hostapd file:\n" + str(std_err))
-            return None, "Unable to create hostapd configuration."
-
-    @staticmethod
-    def store_hostapd_config():
-        """Stores the existing hostapd configuration in /var/log folder"""
-        global hostapd_config_files
-        if hostapd_config_files:
-            qt_configs_folder = "/var/log/qt_configs/"
-            if not os.path.exists(qt_configs_folder):
-                CommandHelper.run_shell_command("sudo mkdir {}".format(qt_configs_folder))
-            for each_hostapd_config in hostapd_config_files:
-                now = datetime.now()
-                dt_string = now.isoformat()
-                CommandHelper.run_shell_command("sudo mv /etc/hostapd/{} {}hostapd_{}.conf".format(each_hostapd_config, qt_configs_folder, dt_string))
+    def create_zephyr_sap_config(config: dict):
+        ApCommandHelper.ap_config = config
+        return None, None
 
     @staticmethod
     def get_existing_hostapd_conf():
@@ -298,7 +233,7 @@ class ApCommandHelper:
             hostapd_config += "\nhe_mu_edca_ac_vo_ecwmin=15"
             hostapd_config += "\nhe_mu_edca_ac_vo_ecwmax=15"
             hostapd_config += "\nhe_mu_edca_ac_vo_timer=255"
-        
+
         if enable_wps:
             if use_mbss:
                hostapd_config += "\nwps_rf_bands=ag"
@@ -339,39 +274,34 @@ class ApCommandHelper:
     @staticmethod
     def ap_start_up():
         """Starts the hostapd service on the AP."""
-        global hostapd_config_files
         #ApCommandHelper.store_test_artifcats = True
         debug_log_level = ApCommandHelper.__get_ap_debug_log_level()
         now = datetime.now()
         dt_string = now.isoformat()
+        if ApCommandHelper.ap_config is None:
+            return None, "Fail to Read AP configuration."
+        security = ""
+        psk = ""
+        ssid = ApCommandHelper.ap_config["ssid"]
+        ch = ApCommandHelper.ap_config["channel"]
+        if "wpa_key_mgmt" in ApCommandHelper.ap_config:
+            security = ApCommandHelper.ap_config["wpa_key_mgmt"]
+        if "wpa_passphrase" in ApCommandHelper.ap_config:
+            psk = ApCommandHelper.ap_config["wpa_passphrase"]
 
         ApCommandHelper.__killall_hostapd()
-        ApCommandHelper.clear_hostapd_logs()
-        std_out, std_err = CommandHelper.run_shell_command("hostapd -v")
-        if std_err is None:
-            #Create new interfaces
-
-            hostapd_start_command = "/usr/local/bin/WFA-Hostapd-Supplicant/hostapd -B -t -g /run/hostapd-global"
-            for each_hostapd_file in hostapd_config_files:
-                hostapd_start_command += " /etc/hostapd/{}".format(each_hostapd_file)
-
-            if debug_log_level:
-                hostapd_start_command += " -f {} {}".format(hostapd_log_folder_path, debug_log_level)
-            CommandHelper.run_shell_command(hostapd_start_command)
-            CommandHelper.pause_execution(3)
-
-            if CommandHelper.BSSID_COUNT > 1: # More then one wlan interface
-                std_out, std_err = CommandHelper.create_new_interface_bridge_network()
-                if std_err is not None:
-                    return None, "Error when creating new interface: {}".format(std_err)
-                CommandHelper.add_all_interfaces_to_bridge()
-            status = ApCommandHelper.check_hostapd_is_active()
-            if status:
-                return "Hostapd service is active", None
-            else:
-                return None, "Unable to start hostapd service."
+        if security == "WPA-PSK":
+            ap_command = "wifi ap enable -s {} -c {} -p {} -k 1".format(ssid, ch, psk)
+        elif not psk or not security:
+            ap_command = "wifi ap enable -s {} -c {} ".format(ssid, ch)
         else:
-            return None, "Hostapd service is not installed." + str(std_out)
+            return "Unknown options.", "Check the AP_CONFIG."
+            
+        ret = cli_serial_helper.execute_and_search(ap_command, "AP enabled")
+        if ret:
+            return "Success to configure SAP in Zephyr.", None
+        else:
+            return None, "Fail to configure SAP in Zephyr."
 
     @staticmethod
     def ap_stop():
@@ -379,24 +309,18 @@ class ApCommandHelper:
         """Stops the hostapd service on the AP."""
         global hostapd_config_files
         if ApCommandHelper.store_test_artifcats:
-            ApCommandHelper.store_hostapd_config()
-            #ApCommandHelper.__log_hostapd_logs()
             ApCommandHelper.store_test_artifcats = False
         hostapd_config_files = []
         status = ApCommandHelper.check_hostapd_is_active()
         if status:
-            CommandHelper.run_shell_command("sudo rfkill unblock wlan")
-            interface_name = CommandHelper.get_interface_name()
-            ApCommandHelper.__killall_hostapd()
-            CommandHelper.pause_execution(3)
+            cli_serial_helper.execute("wifi ap disable")
             status = ApCommandHelper.check_hostapd_is_active()
-
             if not status:
-                return "Hostapd service is inactive.", None
+                return "Already stop AP in Zephyr.", None
             else:
-                return None, "Unable to stop hostapd service."
+                return None, "Unable to stop AP in Zephyr."
         else:
-            return "Hostapd service is inactive.", None
+            return "Already stop AP in Zephyr.", None
 
     @staticmethod
     def __log_hostapd_logs():
@@ -435,24 +359,16 @@ class ApCommandHelper:
         bool
             Boolean representing if hostapd service is active or not.
         """
-        res, _ = CommandHelper.run_shell_command("sudo pidof hostapd")
+        res = cli_serial_helper.execute_and_search("wifi ap status", "State: ENABLED")
         if res:
             return True
         else:
-            DutLogger.log(LogCategory.DEBUG, "Hostapd service is inactive.")
+            DutLogger.log(LogCategory.DEBUG, "AP is inactive.")
             return False
 
     @staticmethod
     def __killall_hostapd():
-        CommandHelper.run_shell_command("sudo killall hostapd")
-
-    @staticmethod
-    def clear_hostapd_logs():
-        """Method to remove the hostapd logs before script execution."""
-        if os.path.exists(hostapd_log_folder_path):
-            CommandHelper.run_shell_command(
-                ("sudo rm -rf {}").format(hostapd_log_folder_path)
-            )
+        cli_serial_helper.execute("wifi ap disable")
 
     @staticmethod
     def get_ap_if_status(if_name):
@@ -650,53 +566,9 @@ class ApCommandHelper:
 
     @staticmethod
     def assign_interface_and_config_file_name(config: dict):
-        append_file = False
-        if "bss_identifier" in config:
-            bss_identifier = int(config.get("bss_identifier"))
-
-            band = bss_identifier & 0x0F
-            identifier = (bss_identifier & 0xF0) >> 4
-            multiple_bssid = (bss_identifier & 0x100) >> 8
-            transmitter = (bss_identifier & 0x200) >> 9
-            hostapd_file_name = ""
-
-            if band == BssIdentifierBand._24GHz.value:
-                hostapd_file_name = "hostapd_24G_"
-            elif band == BssIdentifierBand._5GHz.value:
-                hostapd_file_name = "hostapd_5G_"
-            elif band == BssIdentifierBand._6GHz.value:
-                hostapd_file_name = "hostapd_6G_"
-            hostapd_file_name += str(identifier) + ".conf"
-            config["hostapd_file_name"] = hostapd_file_name
-            # Get if_name from bss_id. If not exist assign id
-            interface_name = CommandHelper.get_interface_name(identifier)
-            if not interface_name:
-                interface_name = CommandHelper.set_interface_bss_id(band=band, bss_id=identifier)
-            if multiple_bssid:
-                DutLogger.log(LogCategory.ERROR, "MBSSID is not fully supported. Platform dependent")
-                return False
-                # Need platform support MBSSID to append file
-                if not transmitter:
-                    append_file = True
-        else:
-            if "he_6g_only" in config:
-                band = BssIdentifierBand._6GHz.value
-            else:
-                hw_mode = config["hw_mode"]
-                if hw_mode == "a":
-                    band = BssIdentifierBand._5GHz.value
-                else:
-                    band = BssIdentifierBand._24GHz.value
-            # Single Wlan use ID 1
-            # WPS will configure twice so try to get if with ID 1 first
-            interface_name = CommandHelper.get_interface_name(bss_id=1)
-            if not interface_name:
-                interface_name = CommandHelper.set_interface_bss_id(band=band, bss_id=1)
-        config["interface_name"] = interface_name
-        return append_file
+        pass
 
     @staticmethod
     def ap_configure(config: dict):
         # Parse BSS_IDENTIFIER TLV in multiple WLANs case
-        append_file = ApCommandHelper.assign_interface_and_config_file_name(config)
-        return ApCommandHelper.create_hostapd_config(config, append_file)
+        return ApCommandHelper.create_zephyr_sap_config(config)

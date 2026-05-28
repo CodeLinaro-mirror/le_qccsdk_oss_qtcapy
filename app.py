@@ -26,6 +26,7 @@ from api.quicktrack_api_linux import QuickTrackApiLinux
 from api.control_app_helper import ControlAppHelper
 from Commands.command_helper import CommandHelper
 from Commands.dut_logger import DutLogger, LogCategory
+from Commands.cli_helper import cli_serial_helper
 from Commands.global_var import *
 from datetime import datetime
 
@@ -57,9 +58,11 @@ if __name__ == "__main__":
         ControlAppHelper.set_wireless_if(options.get("--interface"))
         DutLogger.log(LogCategory.INFO, "Configuring {} as interface for control app usage.\n".format(CommandHelper.get_interface_name()))
 
+    uart_port = ControlAppHelper.get_uart_inputs(options)
+    cli_serial_helper.init(uart_port)
+
     # Use Ethernet as control interface
     ethernet_ip, ethernet_port = ControlAppHelper.get_ethernet_connection_inputs(options)
-    uart_port = ControlAppHelper.get_uart_inputs(options)
     dut_control_app_obj = dutControlApp(
         ConnectionInfo(ConnectionType.ETHERNET, ip_address=ethernet_ip, ip_port=ethernet_port, uart_port=uart_port)
     )

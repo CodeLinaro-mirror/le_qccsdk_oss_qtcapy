@@ -41,86 +41,86 @@ class QuickTrackApiLinux(QuickTrackApiImplementationInterface):
 
     def stop_loop_back_server(self):
         return_status = ControlAppHelper.execute_control_app_api(
-            STOP_LOOP_BACK_SERVER(), self.uart_port  # noqa: F405
+            STOP_LOOP_BACK_SERVER()
         )
         return return_status
 
     def get_ip_address(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            GET_IP_ADDRESS(tlvs_dict), self.uart_port  # noqa: F405
+            GET_IP_ADDRESS(tlvs_dict)
         )
         return return_status
 
     def get_mac_address(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            GET_MAC_ADDRESS(tlvs_dict), self.uart_port  # noqa: F405
+            GET_MAC_ADDRESS(tlvs_dict)
         )
         return return_status
 
     def get_dut_app_version_number(self):
         return_status = ControlAppHelper.execute_control_app_api(
-            GET_CONTROL_APP_VERSION(), self.uart_port  # noqa: F405
+            GET_CONTROL_APP_VERSION()
         )
         return return_status
 
     def sta_associate(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_ASSOCIATE(tlvs_dict), self.uart_port # noqa: F405
+            STA_ASSOCIATE(tlvs_dict)
         )
         return return_status
 
     def sta_disconnect(self):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_DISCONNECT(), self.uart_port  # noqa: F405
+            STA_DISCONNECT()
         )
         return return_status
 
 
     def create_new_interface_bridge_network(self, tlvs_dict):
         ret_status = ControlAppHelper.execute_control_app_api(
-            CREATE_NEW_INTERFACE_BRIDGE_NETWORK(tlvs_dict), self.uart_port
+            CREATE_NEW_INTERFACE_BRIDGE_NETWORK(tlvs_dict)
         )
         return ret_status
 
     def assign_static_ip(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            ASSIGN_STATIC_IP(tlvs_dict), self.uart_port  # noqa: F405
+            ASSIGN_STATIC_IP(tlvs_dict)
         )
         return return_status
 
     def sta_configure(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_CONFIGURE(tlvs_dict), self.uart_port  # noqa: F405
+            STA_CONFIGURE(tlvs_dict)
         )
         return return_status
 
     def sta_set_param(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_SET_PARAM(tlvs_dict), self.uart_port
+            STA_SET_PARAM(tlvs_dict)
         )
         return return_status
 
     def sta_send_disconnect(self):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_SEND_DISCONNECT(), self.uart_port  # noqa: F405
+            STA_SEND_DISCONNECT()
         )
         return return_status
 
     def sta_reassociate(self):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_REASSOCIATE(), self.uart_port
+            STA_REASSOCIATE()
         )
         return return_status
 
     def sta_send_btm_query(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_SEND_BTM_QUERY(tlvs_dict), self.uart_port
+            STA_SEND_BTM_QUERY(tlvs_dict)
         )
         return return_status
 
     def sta_send_anqp_query(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            STA_SEND_ANQP_QUERY(tlvs_dict), self.uart_port
+            STA_SEND_ANQP_QUERY(tlvs_dict)
         )
         return return_status
 
@@ -192,7 +192,7 @@ class QuickTrackApiLinux(QuickTrackApiImplementationInterface):
 
     def device_reset(self, tlvs_dict):
         return_status = ControlAppHelper.execute_control_app_api(
-            DEVICE_RESET(tlvs_dict), self.uart_port  # noqa: F405
+            DEVICE_RESET(tlvs_dict)
         )
         return return_status
 
