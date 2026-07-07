@@ -67,58 +67,34 @@ class StaCommandHelper:
     def sta_configure(config: dict):
         StaCommandHelper.sta_config = config
 
-        key_mgmt = config.get("key_mgmt", "WPA-PSK")
-        proto = config.get("proto", "RSN")
-        pairwise = config.get("pairwise", "CCMP")
-        group = config.get("group", "CCMP")
+        key_mgmt = config.get("key_mgmt", "").strip()
+        proto = config.get("proto", "").strip()
+        pairwise = config.get("pairwise", "").strip()
+        group = config.get("group", "").strip()
 
-        dutEncpType = ""
-        if (re.match('^TKIP$',pairwise,re.I) or re.match('^TKIP$',group,re.I)):
-            dutEncpType = "TKIP"
-        elif (re.match('^CCMP$',pairwise,re.I) or re.match('^CCMP$',group,re.I)):
-            dutEncpType = "CCMP"
-        else:
-            if (re.match('^RSN$',proto,re.I)):
-                dutEncpType = "CCMP"
-            elif (re.match('^WPA$',proto,re.I)):
-                dutEncpType = "TKIP"
-            else:
-                dutEncpType = "CCMP"
-
-        dutkeymgmttype = ""
-        if (re.match('^RSN$',proto,re.I)):
-            if (re.match('^SAE WPA-PSK$',key_mgmt,re.I)):
-                dutkeymgmttype = "SAE_WPA2"
-            elif (re.match('^SAE$',key_mgmt,re.I)):
-                dutkeymgmttype = "SAE"
-            else:
-                dutkeymgmttype = "WPA2"
-        elif (re.match('^WPA$',proto,re.I)):
-            dutkeymgmttype = "WPA"
-        else:
-            dutkeymgmttype = "WPA2"
-
-        security_map = {
-            ("", ""):               0,   # None
-            ("CCMP", "WPA2"):       1,   # WPA2-PSK
-            ("CCMP-256", "WPA2"):   2,   # WPA2-PSK-256
-            ("CCMP", "SAE"):        3,   # SAE (default to HNP)
-            ("CCMP", "SAE-H2E"):    4,   # SAE-H2E
-            ("CCMP", "SAE-AUTO"):   5,   # SAE-AUTO
-            ("CCMP", "WAPI"):       6,   # WAPI
-            ("CCMP", "EAP-TLS"):    7,   # EAP-TLS
-            ("WEP", "WEP"):         8,   # WEP
-            ("TKIP", "WPA"):        9,   # WPA-PSK
-            ("TKIP", "WPA-AUTO"):   10,  # WPA-Auto-Personal
-            ("CCMP", "DPP"):        11,  # DPP
-            ("CCMP", "EAP-PEAP-MSCHAPv2"): 12,
-            ("CCMP", "EAP-PEAP-GTC"):      13,
-            ("CCMP", "EAP-TTLS-MSCHAPv2"): 14,
-            ("CCMP", "EAP-PEAP-TLS"):      15,
-            ("CCMP", "SAE_WPA2"):   20,  # SAE-EXT-KEY / PSK-SAE
-        }
-
-        StaCommandHelper.key_mgmt = security_map.get((dutEncpType, dutkeymgmttype), 0)
+        # Zephyr security key_mgmt
+        # 0:None        1:WPA2-PSK      2:WPA2-PSK-256    3:SAE-HNP
+        # 4:SAE-H2E     5:SAE-AUTO      6:WAPI            7:EAP-TLS
+        # 8:WEP         9: WPA-PSK      10: WPA-Auto-Personal   11: DPP
+        # 12: EAP-PEAP-MSCHAPv2     13: EAP-PEAP-GTC    14: EAP-TTLS-MSCHAPv2
+        # 15: EAP-PEAP-TLS          20: SAE-EXT-KEY
+        StaCommandHelper.key_mgmt = -1
+        if key_mgmt == "NONE":
+            StaCommandHelper.key_mgmt = 0
+        if "WPA-PSK" in key_mgmt:
+            StaCommandHelper.key_mgmt = 10
+            if "RSN" in proto:
+                if "CCMP" in pairwise and "CCMP" in group:
+                    StaCommandHelper.key_mgmt = 1
+                elif "TKIP" in pairwise and "TKIP" in group:
+                    StaCommandHelper.key_mgmt = 10
+            elif "WPA" in proto:
+                if "TKIP" in pairwise and "TKIP" in group:
+                    StaCommandHelper.key_mgmt = 10
+                elif "CCMP" in pairwise and "CCMP" in group:
+                    StaCommandHelper.key_mgmt = 1
+        if "SAE" in key_mgmt:
+            StaCommandHelper.key_mgmt = 5
 
         return "Save station configuration.", None
 
@@ -176,21 +152,15 @@ class StaCommandHelper:
 
     @staticmethod
     def sta_associate():
-        ssid = StaCommandHelper.sta_config["sta_ssid"]
-        psk = ""
-        security = ""
-
-        if "key_mgmt" in StaCommandHelper.sta_config:
-            security = StaCommandHelper.sta_config["key_mgmt"]
+        sta_associate_command = "wifi connect"
+        if "sta_ssid" in StaCommandHelper.sta_config:
+            sta_associate_command = sta_associate_command + " -s {}".format(StaCommandHelper.sta_config["sta_ssid"])
         if "psk" in StaCommandHelper.sta_config:
-            psk = StaCommandHelper.sta_config["psk"]
-
-        if security:
-            sta_associate_command = "wifi connect -k {} -s {}  -p {}".format(StaCommandHelper.key_mgmt, ssid, psk)
-        elif not psk or not security:
-            sta_associate_command = "wifi connect -s {}".format(ssid)
-        else:
-            return "Unknown sta config"
+            sta_associate_command = sta_associate_command + " -p {}".format(StaCommandHelper.sta_config["psk"])
+        if StaCommandHelper.key_mgmt > 0:
+            sta_associate_command = sta_associate_command + " -k {}".format(StaCommandHelper.key_mgmt)
+            if StaCommandHelper.key_mgmt == 5:
+                sta_associate_command = sta_associate_command + " -w 2"
 
         res = cli_serial_helper.execute_and_wait_until(sta_associate_command, "Connected")
         if res:

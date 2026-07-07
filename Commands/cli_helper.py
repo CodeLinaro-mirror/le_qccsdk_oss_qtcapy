@@ -18,7 +18,7 @@ class CLI_Helper:
         #Min delay on reading serial continuous characters for serial.readlines()
         #For example, 'mstop' prints continuous chars 1ms*100=0.1s between '.', if TIMEOUT_S=0.15, then readlines() will hung
         self.TIMEOUT_S = 0.08
-        self.WRITE_CHAR_DELAY_S = 0.001
+        self.WRITE_CHAR_DELAY_S = 0.1
         self.port = serialPort
         self.baudrate = 115200
         self.dutCrashTag  = 0
@@ -69,7 +69,7 @@ class CLI_Helper:
     def writeSerial(self, command):
         logger.info("[DUT_CLI] %s --------> %s", self.port, command)
         retryTimes  = 0
-        try_max_cnt = 50
+        try_max_cnt = 80
         #Clear Buffer
         self.clear_buffer()
 

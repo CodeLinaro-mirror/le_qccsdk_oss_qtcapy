@@ -296,7 +296,7 @@ class ApCommandHelper:
             ap_command = "wifi ap enable -s {} -c {} ".format(ssid, ch)
         else:
             return "Unknown options.", "Check the AP_CONFIG."
-            
+
         ret = cli_serial_helper.execute_and_search(ap_command, "AP enabled")
         if ret:
             return "Success to configure SAP in Zephyr.", None
