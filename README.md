@@ -40,4 +40,4 @@ from .new_ap_command_helper import New_ApCommandHelper as ApCommandHelper
 For QCC730 Run
 ------------------------------------------------------------------------
 STAUT:
-python app.py --ip 192.168.1.77 --port 9004 --interface wlan1 --uart_port com3
+python app.py --ip 192.168.1.77 --port 9004 --interface 1 --uart_port com3
